@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tủ đồ thông minh</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
+      background: linear-gradient(180deg, #eef4ff 0%, #f7faff 100%);
+      color: #14213d;
+    }
+    .page {
+      max-width: 1180px;
+      margin: 28px auto;
+      padding: 16px;
+    }
+    .card {
+      background: rgba(255,255,255,0.96);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 20px 40px rgba(37, 99, 235, 0.08);
+      border: 1px solid #e5eefc;
+    }
+    .eyebrow {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #e0ecff;
+      color: #1d4ed8;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 32px;
+      line-height: 1.15;
+    }
+    .sub {
+      color: #5b6b86;
+      line-height: 1.6;
+      margin-bottom: 22px;
+      max-width: 900px;
+    }
+    .tab-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 20px 0 24px;
+    }
+    .tab-btn {
+      border: none;
+      border-radius: 18px;
+      padding: 14px 22px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #e5e7eb;
+      color: #111827;
+      transition: .15s;
+    }
+    .tab-btn.active {
+      background: #2563eb;
+      color: white;
+      box-shadow: 0 8px 18px rgba(37,99,235,.18);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 20px;
+    }
+    .panel {
+      background: #f8fbff;
+      border: 1px solid #e3edfb;
+      border-radius: 20px;
+      padding: 22px;
+    }
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+    .panel p {
+      margin: 0 0 18px;
+      color: #62708a;
+      line-height: 1.55;
+    }
+    .section { display: none; }
+    .section.active { display: block; }
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .field input,
+    .field select {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid #cdd8ea;
+      border-radius: 16px;
+      font-size: 16px;
+      outline: none;
+      background: white;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .field input:focus,
+    .field select:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+    }
+    .hint {
+      margin-top: 6px;
+      font-size: 13px;
+      color: #6b7280;
+    }
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    button {
+      border: none;
+      border-radius: 16px;
+      padding: 14px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.08s ease, opacity 0.15s ease;
+    }
+    button:active { transform: translateY(1px); }
+    .primary { background: #2563eb; color: white; }
+    .success { background: #16a34a; color: white; }
+    .secondary { background: #e5e7eb; color: #111827; }
+    .danger { background: #ef4444; color: white; }
+    .result-box,
+    .error-box,
+    .command-box {
+      display: none;
+      margin-top: 18px;
+      border-radius: 18px;
+      padding: 16px 18px;
+      line-height: 1.7;
+    }
+    .result-box {
+      background: #eef6ff;
+      color: #174ea6;
+      border: 1px solid #cfe2ff;
+    }
+    .error-box {
+      background: #fff1f2;
+      color: #b42318;
+      border: 1px solid #fecdd3;
+    }
+    .command-box {
+      background: #ecfdf3;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+    .summary-card {
+      background: white;
+      border: 1px solid #e5eefc;
+      border-radius: 18px;
+      padding: 18px;
+    }
+    .summary-item {
+      padding: 12px 0;
+      border-bottom: 1px dashed #d7e3f7;
+    }
+    .summary-item:last-child { border-bottom: none; }
+    .summary-label {
+      color: #64748b;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .summary-value {
+      font-weight: 700;
+      color: #0f172a;
+      word-break: break-word;
+    }
+    .badge {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #ecfdf3;
+      color: #166534;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .locker-list {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .locker-chip {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+      button, .tab-btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <div class="eyebrow">TỦ ĐỒ THÔNG MINH</div>
+      <h1>Giao diện tổng</h1>
+      <div class="sub">
+        Chọn chức năng ở bên dưới để thao tác: <strong>Tra cứu tủ</strong>, <strong>Gửi đồ</strong>, hoặc <strong>Lấy đồ</strong>.
+      </div>
+
+      <div class="tab-row">
+        <button id="tabLookup" class="tab-btn active" onclick="openSection('lookup')">Tra cứu tủ</button>
+        <button id="tabDeposit" class="tab-btn" onclick="openSection('deposit')">Gửi đồ</button>
+        <button id="tabPickup" class="tab-btn" onclick="openSection('pickup')">Lấy đồ</button>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <div id="lookupSection" class="section active">
+            <h2>Tra cứu tủ đồ</h2>
+            <p>Khách hàng nhập họ tên, số điện thoại và CCCD để xem hiện đang gửi ở ngăn nào.</p>
+
+            <div class="field">
+              <label for="lookupName">Họ và tên</label>
+              <input id="lookupName" type="text" placeholder="Ví dụ: Vũ Mạnh Tiến" />
+            </div>
+
+            <div class="field">
+              <label for="lookupPhone">Số điện thoại</label>
+              <input id="lookupPhone" type="text" placeholder="Nhập đúng 10 số, bắt đầu bằng 0" maxlength="10" inputmode="numeric" />
+            </div>
+
+            <div class="field">
+              <label for="lookupCccd">CCCD</label>
+              <input id="lookupCccd" type="text" placeholder="Nhập đúng 12 số CCCD" maxlength="12" inputmode="numeric" />
+            </div>
+
+            <div class="btn-row">
+              <button class="primary" onclick="lookupLockers()">Tra cứu tủ</button>
+              <button class="secondary" onclick="resetLookupForm()">Làm lại</button>
+            </div>
+
+            <div id="lookupError" class="error-box"></div>
+            <div id="lookupResult" class="result-box"></div>
+          </div>
+
+          <div id="depositSection" class="section">
+            <h2>Gửi đồ</h2>
+            <p>Khách nhập tên, số điện thoại, CCCD rồi tự thiết lập mã PIN hoặc RFID để mở tủ gửi đồ vào.</p>
+
+            <div class="field">
+              <label for="depositName">Họ và tên</label>
+              <input id="depositName" type="text" placeholder="Ví dụ: Vũ Mạnh Tiến" />
+            </div>
+
+            <div class="field">
+              <label for="depositPhone">Số điện thoại</label>
+              <input id="depositPhone" type="text" placeholder="Nhập đúng 10 số, bắt đầu bằng 0" maxlength="10" inputmode="numeric" />
+            </div>
+
+            <div class="field">
+              <label for="depositCccd">CCCD</label>
+              <input id="depositCccd" type="text" placeholder="Nhập đúng 12 số CCCD" maxlength="12" inputmode="numeric" />
+            </div>
+
+            <div class="field">
+              <label for="depositLocker">Chọn tủ muốn gửi</label>
+              <select id="depositLocker"></select>
+            </div>
+
+            <div class="field">
+              <label for="depositPin">Tự tạo mã PIN</label>
+              <input id="depositPin" type="password" placeholder="Nhập PIN từ 4 đến 6 số" maxlength="6" inputmode="numeric" />
+              <div class="hint">Không có tạo PIN ngẫu nhiên. Khách phải tự nhập mã số.</div>
+            </div>
+
+            <div class="field">
+              <label for="depositRfid">Quét / nhập RFID</label>
+              <input id="depositRfid" type="text" placeholder="Ví dụ: THE001 hoặc để trống" />
+            </div>
+
+            <div class="btn-row">
+              <button class="success" onclick="depositLocker()">Gửi đồ</button>
+              <button class="secondary" onclick="resetDepositForm()">Làm lại</button>
+            </div>
+
+            <div id="depositError" class="error-box"></div>
+            <div id="depositResult" class="result-box"></div>
+            <div id="depositCommand" class="command-box"></div>
+          </div>
+
+          <div id="pickupSection" class="section">
+            <h2>Lấy đồ</h2>
+            <p>Khách hàng nhập tên, số điện thoại và mã PIN hoặc RFID để mở tủ lấy đồ ra. Chọn đúng tủ cần lấy và bấm lấy đồ.</p>
+
+            <div class="field">
+              <label for="pickupName">Họ và tên</label>
+              <input id="pickupName" type="text" placeholder="Ví dụ: Vũ Mạnh Tiến" />
+            </div>
+
+            <div class="field">
+              <label for="pickupPhone">Số điện thoại</label>
+              <input id="pickupPhone" type="text" placeholder="Nhập đúng 10 số, bắt đầu bằng 0" maxlength="10" inputmode="numeric" />
+            </div>
+
+            <div class="field">
+              <label for="pickupPin">Mã PIN</label>
+              <input id="pickupPin" type="password" placeholder="Nhập mã PIN nếu có" maxlength="6" inputmode="numeric" />
+            </div>
+
+            <div class="field">
+              <label for="pickupRfid">RFID</label>
+              <input id="pickupRfid" type="text" placeholder="Nhập mã RFID nếu có" />
+            </div>
+
+            <div class="field">
+              <label for="pickupLocker">Chọn tủ cần mở</label>
+              <select id="pickupLocker">
+                <option value="">-- Chọn tủ --</option>
+                <option value="1">Ngăn 1</option>
+                <option value="2">Ngăn 2</option>
+                <option value="3">Ngăn 3</option>
+                <option value="4">Ngăn 4</option>
+              </select>
+            </div>
+
+            <div class="btn-row">
+              <button class="primary" onclick="searchPickupSessions()">Tra cứu phiên lấy</button>
+              <button class="success" onclick="pickupLocker()">Lấy đồ</button>
+              <button class="danger" onclick="returnRfid()">Trả thẻ RFID</button>
+              <button class="secondary" onclick="resetPickupForm()">Làm lại</button>
+            </div>
+
+            <div id="pickupError" class="error-box"></div>
+            <div id="pickupResult" class="result-box"></div>
+            <div id="pickupCommand" class="command-box"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Tóm tắt thao tác</h2>
+          <p>Thông tin bên phải sẽ đổi theo chức năng bạn đang chọn.</p>
+
+          <div class="summary-card">
+            <div class="summary-item">
+              <div class="summary-label">Chức năng hiện tại</div>
+              <div class="summary-value" id="sumMode">Tra cứu tủ</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Khách hàng</div>
+              <div class="summary-value" id="sumName">Chưa có</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Số điện thoại</div>
+              <div class="summary-value" id="sumPhone">Chưa có</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">CCCD</div>
+              <div class="summary-value" id="sumCccd">Chưa có</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">PIN</div>
+              <div class="summary-value" id="sumPin">----</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">RFID</div>
+              <div class="summary-value" id="sumRfid">Chưa có</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Tủ đang chọn</div>
+              <div class="summary-value" id="sumLocker">Chưa chọn</div>
+            </div>
+          </div>
+
+          <div class="badge" id="summaryBadge">Hệ thống đang ở chế độ tra cứu tủ</div>
+          <div id="sideExtra" class="result-box" style="display:block; margin-top:16px;">
+            Chưa có thao tác nào được thực hiện.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'smartLockerSessions_final';
+    const API_BASE = 'http://127.0.0.1:5000';
+    let currentMode = 'lookup';
+    let pickupMatches = [];
+
+    function defaultSessions() {
+      return [
+        {
+          locker: '1',
+          name: 'Vu Manh Tien',
+          phone: '0373997398',
+          cccd: '067203001496',
+          pin: '1234',
+          rfid: '12345',
+          active: true,
+          cardReturned: false
+        }
+      ];
+    }
+
+    function loadSessions() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        const data = defaultSessions();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        return data;
+      }
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        const data = defaultSessions();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        return data;
+      }
+    }
+
+    let sessions = loadSessions();
+
+    function saveSessions() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    }
+
+    function normalizeText(text) {
+      return (text || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function cleanDigits(value) {
+      return (value || '').replace(/\D/g, '').trim();
+    }
+
+    function validatePhone(phone) {
+      return /^0\d{9}$/.test(phone);
+    }
+
+    function validateCCCD(cccd) {
+      return /^\d{12}$/.test(cccd);
+    }
+
+    function validatePin(pin) {
+      return /^\d{4,6}$/.test(pin);
+    }
+
+    function maskPhone(phone) {
+      if (!phone || phone.length !== 10) return phone || '';
+      return phone.slice(0, 6) + '****';
+    }
+
+    function maskCccd(cccd) {
+      if (!cccd || cccd.length < 4) return '************';
+      return '********' + cccd.slice(-4);
+    }
+
+    async function sendLockerCommand(lockerId) {
+      const res = await fetch(`${API_BASE}/open_locker`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locker_id: lockerId })
+      });
+
+      const data = await res.json();
+      if (!data.ok) {
+        throw new Error(data.message || 'Không gửi được lệnh tới ESP32');
+      }
+      return data;
+    }
+
+    function setSummary({ mode, name, phone, cccd, pin, rfid, locker, note }) {
+      document.getElementById('sumMode').textContent = mode || 'Chưa có';
+      document.getElementById('sumName').textContent = name || 'Chưa có';
+      document.getElementById('sumPhone').textContent = phone || 'Chưa có';
+      document.getElementById('sumCccd').textContent = cccd || 'Chưa có';
+      document.getElementById('sumPin').textContent = pin || '----';
+      document.getElementById('sumRfid').textContent = rfid || 'Chưa có';
+      document.getElementById('sumLocker').textContent = locker || 'Chưa chọn';
+      document.getElementById('sideExtra').innerHTML = note || 'Chưa có thao tác nào được thực hiện.';
+    }
+
+    function capitalize(text) {
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
+    function clearBox(id) {
+      const el = document.getElementById(id);
+      el.style.display = 'none';
+      el.innerHTML = '';
+    }
+
+    function showBox(id, html) {
+      const el = document.getElementById(id);
+      el.style.display = 'block';
+      el.innerHTML = html;
+    }
+
+    function openSection(section) {
+      currentMode = section;
+      document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+      document.getElementById(section + 'Section').classList.add('active');
+
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab' + capitalize(section)).classList.add('active');
+
+      if (section === 'lookup') {
+        document.getElementById('summaryBadge').textContent = 'Hệ thống đang ở chế độ tra cứu tủ';
+        refreshLookupSummary();
+      } else if (section === 'deposit') {
+        document.getElementById('summaryBadge').textContent = 'Hệ thống đang ở chế độ gửi đồ';
+        renderDepositLockerOptions();
+        refreshDepositSummary();
+      } else {
+        document.getElementById('summaryBadge').textContent = 'Hệ thống đang ở chế độ lấy đồ';
+        refreshPickupSummary();
+      }
+    }
+
+    function renderDepositLockerOptions() {
+      const select = document.getElementById('depositLocker');
+      const busy = sessions.filter(s => s.active).map(s => s.locker);
+      select.innerHTML = '<option value="">-- Chọn tủ --</option>';
+      for (let i = 1; i <= 4; i++) {
+        const option = document.createElement('option');
+        option.value = String(i);
+        option.textContent = 'Ngăn ' + i + (busy.includes(String(i)) ? ' (đã dùng)' : '');
+        option.disabled = busy.includes(String(i));
+        select.appendChild(option);
+      }
+    }
+
+    function lookupLockers() {
+      clearBox('lookupError');
+      clearBox('lookupResult');
+
+      const name = document.getElementById('lookupName').value.trim();
+      const phone = cleanDigits(document.getElementById('lookupPhone').value);
+      const cccd = cleanDigits(document.getElementById('lookupCccd').value);
+
+      document.getElementById('lookupPhone').value = phone;
+      document.getElementById('lookupCccd').value = cccd;
+
+      if (!name || !phone || !cccd) {
+        showBox('lookupError', 'Vui lòng nhập đầy đủ họ tên, số điện thoại và CCCD để tra cứu.');
+        return;
+      }
+      if (!validatePhone(phone)) {
+        showBox('lookupError', 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0.');
+        return;
+      }
+      if (!validateCCCD(cccd)) {
+        showBox('lookupError', 'CCCD phải đúng 12 chữ số.');
+        return;
+      }
+
+      const matches = sessions.filter(s =>
+        s.active &&
+        normalizeText(s.name) === normalizeText(name) &&
+        s.phone === phone &&
+        s.cccd === cccd
+      );
+
+      if (!matches.length) {
+        showBox('lookupError', 'Không tìm thấy tủ nào đang được gửi bởi khách hàng này.');
+        return;
+      }
+
+      const lockerHtml = matches.map(item => `<span class="locker-chip">Ngăn ${item.locker}</span>`).join('');
+      showBox('lookupResult', `
+        <strong>Tra cứu thành công</strong><br>
+        Tên khách hàng: ${name}<br>
+        Số điện thoại: ${maskPhone(phone)}<br>
+        CCCD: ${maskCccd(cccd)}<br>
+        <div class="locker-list">${lockerHtml}</div>
+      `);
+    }
+
+    async function depositLocker() {
+      clearBox('depositError');
+      clearBox('depositResult');
+      clearBox('depositCommand');
+
+      const name = document.getElementById('depositName').value.trim();
+      const phone = cleanDigits(document.getElementById('depositPhone').value);
+      const cccd = cleanDigits(document.getElementById('depositCccd').value);
+      const locker = document.getElementById('depositLocker').value;
+      const pin = cleanDigits(document.getElementById('depositPin').value);
+      const rfid = document.getElementById('depositRfid').value.trim().toUpperCase();
+
+      document.getElementById('depositPhone').value = phone;
+      document.getElementById('depositCccd').value = cccd;
+      document.getElementById('depositPin').value = pin;
+
+      if (!name || !phone || !cccd || !locker) {
+        showBox('depositError', 'Vui lòng nhập đầy đủ họ tên, số điện thoại, CCCD và chọn tủ.');
+        return;
+      }
+      if (!validatePhone(phone)) {
+        showBox('depositError', 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0.');
+        return;
+      }
+      if (!validateCCCD(cccd)) {
+        showBox('depositError', 'CCCD phải đúng 12 chữ số.');
+        return;
+      }
+      if (!pin && !rfid) {
+        showBox('depositError', 'Khách phải nhập ít nhất một cách mở tủ: mã PIN hoặc RFID.');
+        return;
+      }
+      if (pin && !validatePin(pin)) {
+        showBox('depositError', 'Nếu dùng PIN thì PIN phải từ 4 đến 6 chữ số.');
+        return;
+      }
+
+      const lockerUsed = sessions.some(s => s.active && s.locker === locker);
+      if (lockerUsed) {
+        showBox('depositError', 'Tủ này hiện đã có người dùng, vui lòng chọn tủ khác.');
+        renderDepositLockerOptions();
+        return;
+      }
+
+      const session = {
+        locker, name, phone, cccd, pin, rfid,
+        active: true,
+        cardReturned: !rfid
+      };
+
+      sessions.push(session);
+      saveSessions();
+      renderDepositLockerOptions();
+
+      try {
+        const espResult = await sendLockerCommand(locker);
+
+        showBox('depositResult', `
+          <strong>Gửi đồ thành công</strong><br>
+          Khách hàng: ${name}<br>
+          Số điện thoại: ${maskPhone(phone)}<br>
+          CCCD: ${maskCccd(cccd)}<br>
+          Tủ đã cấp: Ngăn ${locker}<br>
+          ${pin ? `PIN: <strong>${pin}</strong><br>` : ''}
+          ${rfid ? `RFID: <strong>${rfid}</strong><br>` : ''}
+          ESP32 phản hồi: <strong>${espResult.esp32_response}</strong>
+        `);
+
+        showBox('depositCommand', `
+          <strong>Lệnh gửi sang ESP32:</strong><br>
+          ${espResult.command}
+        `);
+      } catch (err) {
+        showBox('depositError', 'Đã lưu dữ liệu nhưng không gửi được lệnh tới ESP32: ' + err.message);
+      }
+    }
+
+    function findPickupMatch(locker, name, phone, pin, rfid) {
+      return sessions.find(s =>
+        s.active &&
+        s.locker === locker &&
+        normalizeText(s.name) === normalizeText(name) &&
+        s.phone === phone &&
+        ((pin && s.pin === pin) || (rfid && s.rfid === rfid))
+      );
+    }
+
+    function searchPickupSessions() {
+      clearBox('pickupError');
+      clearBox('pickupResult');
+      clearBox('pickupCommand');
+
+      const name = document.getElementById('pickupName').value.trim();
+      const phone = cleanDigits(document.getElementById('pickupPhone').value);
+      const pin = cleanDigits(document.getElementById('pickupPin').value);
+      const rfid = document.getElementById('pickupRfid').value.trim().toUpperCase();
+
+      document.getElementById('pickupPhone').value = phone;
+      document.getElementById('pickupPin').value = pin;
+
+      if (!name || !phone) {
+        showBox('pickupError', 'Vui lòng nhập họ tên và số điện thoại.');
+        return;
+      }
+      if (!validatePhone(phone)) {
+        showBox('pickupError', 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0.');
+        return;
+      }
+      if (!pin && !rfid) {
+        showBox('pickupError', 'Khách phải nhập ít nhất mã PIN hoặc RFID để lấy đồ.');
+        return;
+      }
+
+      pickupMatches = sessions.filter(s =>
+        s.active &&
+        normalizeText(s.name) === normalizeText(name) &&
+        s.phone === phone &&
+        ((pin && s.pin === pin) || (rfid && s.rfid === rfid))
+      );
+
+      if (!pickupMatches.length) {
+        showBox('pickupError', 'Không tìm thấy phiên lấy đồ phù hợp.');
+        return;
+      }
+
+      showBox('pickupResult', `
+        <strong>Tra cứu thành công</strong><br>
+        Đã tìm thấy ${pickupMatches.length} tủ phù hợp: ${pickupMatches.map(m => 'Ngăn ' + m.locker).join(', ')}.
+      `);
+    }
+
+    async function pickupLocker() {
+      clearBox('pickupError');
+      clearBox('pickupCommand');
+
+      const name = document.getElementById('pickupName').value.trim();
+      const phone = cleanDigits(document.getElementById('pickupPhone').value);
+      const pin = cleanDigits(document.getElementById('pickupPin').value);
+      const rfid = document.getElementById('pickupRfid').value.trim().toUpperCase();
+      const locker = document.getElementById('pickupLocker').value;
+
+      document.getElementById('pickupPhone').value = phone;
+      document.getElementById('pickupPin').value = pin;
+
+      if (!name || !phone || !locker) {
+        showBox('pickupError', 'Vui lòng nhập họ tên, số điện thoại và chọn tủ cần mở.');
+        return;
+      }
+      if (!validatePhone(phone)) {
+        showBox('pickupError', 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0.');
+        return;
+      }
+      if (!pin && !rfid) {
+        showBox('pickupError', 'Khách phải nhập ít nhất mã PIN hoặc RFID để lấy đồ.');
+        return;
+      }
+
+      const matched = findPickupMatch(locker, name, phone, pin, rfid);
+      if (!matched) {
+        showBox('pickupError', 'Thông tin không khớp với tủ đã chọn.');
+        return;
+      }
+
+      try {
+        const espResult = await sendLockerCommand(matched.locker);
+
+        matched.active = false;
+        saveSessions();
+        renderDepositLockerOptions();
+
+        showBox('pickupResult', `
+          <strong>Lấy đồ thành công</strong><br>
+          Khách hàng: ${matched.name}<br>
+          Số điện thoại: ${maskPhone(matched.phone)}<br>
+          Tủ được mở: Ngăn ${matched.locker}<br>
+          ESP32 phản hồi: <strong>${espResult.esp32_response}</strong><br>
+          Phiên gửi đồ đã kết thúc.
+        `);
+
+        showBox('pickupCommand', `
+          <strong>Lệnh gửi sang ESP32:</strong><br>
+          ${espResult.command}
+        `);
+      } catch (err) {
+        showBox('pickupError', 'Không gửi được lệnh mở tủ tới ESP32: ' + err.message);
+      }
+    }
+
+    function returnRfid() {
+      clearBox('pickupError');
+
+      const name = document.getElementById('pickupName').value.trim();
+      const phone = cleanDigits(document.getElementById('pickupPhone').value);
+      const pin = cleanDigits(document.getElementById('pickupPin').value);
+      const rfid = document.getElementById('pickupRfid').value.trim().toUpperCase();
+      const locker = document.getElementById('pickupLocker').value;
+
+      if (!name || !phone || !locker) {
+        showBox('pickupError', 'Vui lòng nhập họ tên, số điện thoại và chọn tủ trước khi trả thẻ RFID.');
+        return;
+      }
+
+      const matched = sessions.find(s =>
+        s.locker === locker &&
+        normalizeText(s.name) === normalizeText(name) &&
+        s.phone === phone &&
+        ((pin && s.pin === pin) || (rfid && s.rfid === rfid) || (!pin && !rfid))
+      );
+
+      if (!matched) {
+        showBox('pickupError', 'Không tìm thấy phiên phù hợp với tủ đã chọn để trả thẻ RFID.');
+        return;
+      }
+      if (!matched.rfid) {
+        showBox('pickupError', 'Phiên này không dùng RFID nên không có thẻ để trả.');
+        return;
+      }
+
+      matched.rfid = '';
+      matched.cardReturned = true;
+      saveSessions();
+
+      showBox('pickupResult', `
+        <strong>Đã trả thẻ RFID</strong><br>
+        Tủ: Ngăn ${matched.locker}<br>
+        Hệ thống đã cập nhật trạng thái khách trả thẻ thành công.
+      `);
+    }
+
+    function refreshLookupSummary() {
+      setSummary({
+        mode: 'Tra cứu tủ',
+        name: document.getElementById('lookupName').value.trim() || 'Chưa có',
+        phone: cleanDigits(document.getElementById('lookupPhone').value) || 'Chưa có',
+        cccd: cleanDigits(document.getElementById('lookupCccd').value) ? maskCccd(cleanDigits(document.getElementById('lookupCccd').value)) : 'Chưa có',
+        pin: '----',
+        rfid: 'Không dùng',
+        locker: 'Chưa xác định',
+        note: 'Khách đang chuẩn bị tra cứu tủ.'
+      });
+    }
+
+    function refreshDepositSummary() {
+      const locker = document.getElementById('depositLocker').value;
+      setSummary({
+        mode: 'Gửi đồ',
+        name: document.getElementById('depositName').value.trim() || 'Chưa có',
+        phone: cleanDigits(document.getElementById('depositPhone').value) || 'Chưa có',
+        cccd: cleanDigits(document.getElementById('depositCccd').value) ? maskCccd(cleanDigits(document.getElementById('depositCccd').value)) : 'Chưa có',
+        pin: cleanDigits(document.getElementById('depositPin').value) || '----',
+        rfid: document.getElementById('depositRfid').value.trim().toUpperCase() || 'Không dùng thẻ',
+        locker: locker ? 'Ngăn ' + locker : 'Chưa chọn',
+        note: 'Khách đang chuẩn bị tạo phiên gửi đồ.'
+      });
+    }
+
+    function refreshPickupSummary() {
+      const locker = document.getElementById('pickupLocker').value;
+      setSummary({
+        mode: 'Lấy đồ',
+        name: document.getElementById('pickupName').value.trim() || 'Chưa có',
+        phone: cleanDigits(document.getElementById('pickupPhone').value) || 'Chưa có',
+        cccd: 'Không yêu cầu',
+        pin: cleanDigits(document.getElementById('pickupPin').value) || '----',
+        rfid: document.getElementById('pickupRfid').value.trim().toUpperCase() || 'Không dùng thẻ',
+        locker: locker ? 'Ngăn ' + locker : 'Chưa chọn',
+        note: 'Khách có thể chọn trực tiếp tủ cần lấy.'
+      });
+    }
+
+    function resetLookupForm() {
+      document.getElementById('lookupName').value = '';
+      document.getElementById('lookupPhone').value = '';
+      document.getElementById('lookupCccd').value = '';
+      clearBox('lookupError');
+      clearBox('lookupResult');
+      refreshLookupSummary();
+    }
+
+    function resetDepositForm() {
+      document.getElementById('depositName').value = '';
+      document.getElementById('depositPhone').value = '';
+      document.getElementById('depositCccd').value = '';
+      document.getElementById('depositLocker').value = '';
+      document.getElementById('depositPin').value = '';
+      document.getElementById('depositRfid').value = '';
+      clearBox('depositError');
+      clearBox('depositResult');
+      clearBox('depositCommand');
+      refreshDepositSummary();
+    }
+
+    function resetPickupForm() {
+      document.getElementById('pickupName').value = '';
+      document.getElementById('pickupPhone').value = '';
+      document.getElementById('pickupPin').value = '';
+      document.getElementById('pickupRfid').value = '';
+      document.getElementById('pickupLocker').value = '';
+      pickupMatches = [];
+      clearBox('pickupError');
+      clearBox('pickupResult');
+      clearBox('pickupCommand');
+      refreshPickupSummary();
+    }
+
+    function bindOnlyNumber(id, maxLen, refreshFn) {
+      document.getElementById(id).addEventListener('input', function () {
+        this.value = cleanDigits(this.value).slice(0, maxLen);
+        refreshFn();
+      });
+    }
+
+    bindOnlyNumber('lookupPhone', 10, refreshLookupSummary);
+    bindOnlyNumber('lookupCccd', 12, refreshLookupSummary);
+    bindOnlyNumber('depositPhone', 10, refreshDepositSummary);
+    bindOnlyNumber('depositCccd', 12, refreshDepositSummary);
+    bindOnlyNumber('depositPin', 6, refreshDepositSummary);
+    bindOnlyNumber('pickupPhone', 10, refreshPickupSummary);
+    bindOnlyNumber('pickupPin', 6, refreshPickupSummary);
+
+    document.getElementById('lookupName').addEventListener('input', refreshLookupSummary);
+    document.getElementById('depositName').addEventListener('input', refreshDepositSummary);
+    document.getElementById('depositRfid').addEventListener('input', refreshDepositSummary);
+    document.getElementById('depositLocker').addEventListener('change', refreshDepositSummary);
+    document.getElementById('pickupName').addEventListener('input', refreshPickupSummary);
+    document.getElementById('pickupRfid').addEventListener('input', refreshPickupSummary);
+    document.getElementById('pickupLocker').addEventListener('change', refreshPickupSummary);
+
+    renderDepositLockerOptions();
+    openSection('lookup');
+  </script>
+</body>
+</html>
