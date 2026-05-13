@@ -1,378 +1,301 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+
 import firebase_admin
 from firebase_admin import credentials, db
 
+import serial
+import time
+import threading
+
+# =========================
+# FLASK INIT
+# =========================
 app = Flask(__name__)
 CORS(app)
 
+# =========================
+# FIREBASE INIT
+# =========================
 cred = credentials.Certificate("serviceAccountKey.json")
 
 firebase_admin.initialize_app(cred, {
     "databaseURL": "https://test-fcb1f-default-rtdb.asia-southeast1.firebasedatabase.app/"
 })
 
+# =========================
+# SERIAL CONFIG
+# =========================
+SERIAL_PORT = "COM5"
+BAUD_RATE = 9600
+ser = None
+
+latest_rfid = ""
+last_rfid_time = 0
 
 # =========================
-# HÀM PHỤ
+# SERIAL CONNECT
 # =========================
+def get_serial():
+    global ser
 
-def clean_digits(value):
-    if value is None:
-        return ""
-    return "".join(filter(str.isdigit, str(value).strip()))
+    try:
+        if ser and ser.is_open:
+            return ser
+
+        print("CONNECTING ESP32...")
+
+        ser = serial.Serial(
+            SERIAL_PORT,
+            BAUD_RATE,
+            timeout=1
+        )
+
+        time.sleep(2)
+        print("ESP32 CONNECTED")
+
+        return ser
+
+    except Exception as e:
+        print("SERIAL ERROR:", e)
+        return None
 
 
-def validate_phone(phone):
-    return len(phone) == 10 and phone.startswith("0")
+# =========================
+# SEND TO ESP32
+# =========================
+def send_command(command):
+    try:
+        conn = get_serial()
+        if not conn:
+            return {"success": False, "message": "No ESP32"}
+
+        conn.write((command + "\n").encode())
+        conn.flush()
+
+        return {"success": True, "command": command}
+
+    except Exception as e:
+        return {"success": False, "message": str(e)}
 
 
-def validate_cccd(cccd):
-    return len(cccd) == 12 and cccd.isdigit()
+# =========================
+# SERIAL LISTENER (FIXED)
+# =========================
+def serial_listener():
+    global latest_rfid, ser, last_rfid_time
+
+    while True:
+        try:
+            conn = get_serial()
+            if not conn:
+                time.sleep(2)
+                continue
+
+            line = conn.readline().decode("utf-8", errors="ignore").strip()
+
+            if not line:
+                continue
+
+            print("ESP32:", line)
+
+            if "RFID_UID:" in line:
+
+                uid = line.replace("RFID_UID:", "").strip().upper()
+
+                now = time.time()
+
+                # CHỐNG spam + đọc lặp cùng thẻ
+                if uid != latest_rfid or (now - last_rfid_time > 3):
+
+                    latest_rfid = uid
+                    last_rfid_time = now
+
+                    print("RFID:", latest_rfid)
+
+        except Exception as e:
+            print("SERIAL ERROR:", e)
+            try:
+                if ser:
+                    ser.close()
+            except:
+                pass
+
+            ser = None
+            time.sleep(2)
 
 
-def validate_pin(pin):
-    return pin == "" or (pin.isdigit() and 4 <= len(pin) <= 6)
+# =========================
+# UTIL
+# =========================
+def clean_digits(v):
+    return "".join(filter(str.isdigit, str(v or "")))
 
-
-def normalize_text(text):
-    return str(text or "").strip().lower()
-
-
-def get_all_sessions():
+def get_sessions():
     ref = db.reference("sessions")
     data = ref.get()
-
-    if data is None:
-        return {}
-
-    return data
-
+    return data if data else {}
 
 def is_locker_busy(locker):
-    sessions = get_all_sessions()
+    sessions = get_sessions()
 
-    for session_id, session in sessions.items():
-        if (
-            str(session.get("locker")) == str(locker)
-            and session.get("active") == True
-        ):
+    for _, s in sessions.items():
+        if s.get("active") and str(s.get("locker")) == str(locker):
             return True
-
     return False
 
 
 # =========================
-# 1. API TRA CỨU TỦ
+# HOME
 # =========================
+@app.route("/")
+def home():
+    return jsonify({"success": True, "message": "Backend running"})
 
-@app.route("/lookup", methods=["POST"])
-def lookup_lockers():
-    data = request.get_json()
 
-    name = data.get("name", "").strip()
-    phone = clean_digits(data.get("phone", ""))
-    cccd = clean_digits(data.get("cccd", ""))
-
-    if not name or not phone or not cccd:
-        return jsonify({
-            "success": False,
-            "message": "Vui lòng nhập đầy đủ họ tên, số điện thoại và CCCD."
-        }), 400
-
-    if not validate_phone(phone):
-        return jsonify({
-            "success": False,
-            "message": "Số điện thoại phải đủ 10 số và bắt đầu bằng số 0."
-        }), 400
-
-    if not validate_cccd(cccd):
-        return jsonify({
-            "success": False,
-            "message": "CCCD phải đúng 12 chữ số."
-        }), 400
-
-    sessions = get_all_sessions()
-    matches = []
-
-    for session_id, session in sessions.items():
-        if (
-            session.get("active") == True
-            and normalize_text(session.get("name")) == normalize_text(name)
-            and session.get("phone") == phone
-            and session.get("cccd") == cccd
-        ):
-            matches.append({
-                "session_id": session_id,
-                "locker": session.get("locker"),
-                "name": session.get("name"),
-                "phone": session.get("phone"),
-                "cccd": session.get("cccd"),
-                "rfid": session.get("rfid", ""),
-                "active": session.get("active")
-            })
-
-    if not matches:
-        return jsonify({
-            "success": False,
-            "message": "Không tìm thấy tủ nào đang được gửi bởi khách hàng này."
-        }), 404
-
+# =========================
+# RFID GET (SAFE)
+# =========================
+@app.route("/latest-rfid", methods=["GET"])
+def get_rfid():
+    global latest_rfid
     return jsonify({
         "success": True,
-        "message": "Tra cứu thành công",
-        "lockers": matches
-    }), 200
+        "rfid": latest_rfid
+    })
 
 
 # =========================
-# 2. API GỬI ĐỒ
+# CLEAR RFID (IMPORTANT)
 # =========================
+@app.route("/clear-rfid", methods=["POST"])
+def clear_rfid():
+    global latest_rfid
+    latest_rfid = ""
+    return jsonify({"success": True})
 
+
+# =========================
+# DEPOSIT
+# =========================
 @app.route("/deposit", methods=["POST"])
-def deposit_locker():
-    data = request.get_json()
+def deposit():
+    data = request.json
 
     name = data.get("name", "").strip()
-    phone = clean_digits(data.get("phone", ""))
-    cccd = clean_digits(data.get("cccd", ""))
-    locker = str(data.get("locker", "")).strip()
+    phone = clean_digits(data.get("phone"))
+    cccd = clean_digits(data.get("cccd"))
+    locker = str(data.get("locker", ""))
     pin = clean_digits(data.get("pin", ""))
     rfid = data.get("rfid", "").strip().upper()
 
-    if not name or not phone or not cccd or not locker:
-        return jsonify({
-            "success": False,
-            "message": "Vui lòng nhập đầy đủ họ tên, số điện thoại, CCCD và chọn tủ."
-        }), 400
+    if not (name and phone and cccd and locker):
+        return jsonify({"success": False, "message": "Missing data"}), 400
 
-    if not validate_phone(phone):
-        return jsonify({
-            "success": False,
-            "message": "Số điện thoại phải đủ 10 số và bắt đầu bằng số 0."
-        }), 400
+    if len(phone) != 10 or not phone.startswith("0"):
+        return jsonify({"success": False, "message": "Phone invalid"}), 400
 
-    if not validate_cccd(cccd):
-        return jsonify({
-            "success": False,
-            "message": "CCCD phải đúng 12 chữ số."
-        }), 400
-
-    if locker not in ["1", "2", "3", "4", "5", "6", "7", "8"]:
-        return jsonify({
-            "success": False,
-            "message": "Tủ không hợp lệ. Chỉ được chọn tủ từ 1 đến 8."
-        }), 400
+    if len(cccd) != 12:
+        return jsonify({"success": False, "message": "CCCD invalid"}), 400
 
     if not pin and not rfid:
-        return jsonify({
-            "success": False,
-            "message": "Khách phải nhập ít nhất một cách mở tủ: mã PIN hoặc RFID."
-        }), 400
-
-    if pin and not validate_pin(pin):
-        return jsonify({
-            "success": False,
-            "message": "PIN phải từ 4 đến 6 chữ số."
-        }), 400
+        return jsonify({"success": False, "message": "Need PIN or RFID"}), 400
 
     if is_locker_busy(locker):
-        return jsonify({
-            "success": False,
-            "message": "Tủ này hiện đã có người dùng, vui lòng chọn tủ khác."
-        }), 409
+        return jsonify({"success": False, "message": "Locker busy"}), 409
 
-    session_data = {
-        "locker": locker,
+    # check RFID duplicate
+    sessions = get_sessions()
+    for s in sessions.values():
+        if s.get("active") and s.get("rfid") == rfid and rfid:
+            return jsonify({"success": False, "message": "RFID already used"}), 409
+
+    cmd = f"OPEN_LOCKER_{locker}"
+
+    ref = db.reference("sessions")
+    new = ref.push({
         "name": name,
         "phone": phone,
         "cccd": cccd,
+        "locker": locker,
         "pin": pin,
         "rfid": rfid,
         "active": True,
-        "cardReturned": False if rfid else True,
-        "command": f"OPEN_LOCKER_{locker}"
-    }
-
-    ref = db.reference("sessions")
-    new_session = ref.push(session_data)
-
-    return jsonify({
-        "success": True,
-        "message": "Gửi đồ thành công",
-        "session_id": new_session.key,
-        "data": session_data,
-        "esp32_command": f"OPEN_LOCKER_{locker}"
-    }), 201
-
-
-# =========================
-# 3. API LẤY ĐỒ
-# =========================
-
-@app.route("/pickup", methods=["POST"])
-def pickup_locker():
-    data = request.get_json()
-
-    name = data.get("name", "").strip()
-    phone = clean_digits(data.get("phone", ""))
-    locker = str(data.get("locker", "")).strip()
-    pin = clean_digits(data.get("pin", ""))
-    rfid = data.get("rfid", "").strip().upper()
-
-    if not name or not phone or not locker:
-        return jsonify({
-            "success": False,
-            "message": "Vui lòng nhập họ tên, số điện thoại và chọn tủ cần mở."
-        }), 400
-
-    if not validate_phone(phone):
-        return jsonify({
-            "success": False,
-            "message": "Số điện thoại phải đủ 10 số và bắt đầu bằng số 0."
-        }), 400
-
-    if not pin and not rfid:
-        return jsonify({
-            "success": False,
-            "message": "Khách phải nhập ít nhất mã PIN hoặc RFID để lấy đồ."
-        }), 400
-
-    if pin and not validate_pin(pin):
-        return jsonify({
-            "success": False,
-            "message": "PIN phải từ 4 đến 6 chữ số."
-        }), 400
-
-    sessions = get_all_sessions()
-    matched_id = None
-    matched_session = None
-
-    for session_id, session in sessions.items():
-        correct_user = (
-            session.get("active") == True
-            and str(session.get("locker")) == locker
-            and normalize_text(session.get("name")) == normalize_text(name)
-            and session.get("phone") == phone
-        )
-
-        correct_auth = (
-            (pin and session.get("pin") == pin)
-            or
-            (rfid and session.get("rfid") == rfid)
-        )
-
-        if correct_user and correct_auth:
-            matched_id = session_id
-            matched_session = session
-            break
-
-    if not matched_session:
-        return jsonify({
-            "success": False,
-            "message": "Thông tin không khớp với tủ đã chọn. Vui lòng kiểm tra lại."
-        }), 404
-
-    update_ref = db.reference(f"sessions/{matched_id}")
-    update_ref.update({
-        "active": False,
-        "command": f"OPEN_LOCKER_{locker}"
+        "command": cmd
     })
 
+    send_command(cmd)
+
     return jsonify({
         "success": True,
-        "message": "Lấy đồ thành công",
-        "session_id": matched_id,
-        "data": matched_session,
-        "esp32_command": f"OPEN_LOCKER_{locker}"
-    }), 200
+        "session_id": new.key,
+        "esp32_command": cmd
+    })
 
 
 # =========================
-# 4. API TRA CỨU PHIÊN LẤY ĐỒ
-# Dùng để tìm khách có những tủ nào trước khi bấm lấy đồ
+# PICKUP
 # =========================
-
-@app.route("/pickup/search", methods=["POST"])
-def search_pickup_sessions():
-    data = request.get_json()
+@app.route("/pickup", methods=["POST"])
+def pickup():
+    data = request.json
 
     name = data.get("name", "").strip()
-    phone = clean_digits(data.get("phone", ""))
+    phone = clean_digits(data.get("phone"))
+    locker = str(data.get("locker", ""))
     pin = clean_digits(data.get("pin", ""))
     rfid = data.get("rfid", "").strip().upper()
 
-    if not name or not phone:
-        return jsonify({
-            "success": False,
-            "message": "Vui lòng nhập họ tên và số điện thoại."
-        }), 400
+    sessions = get_sessions()
 
-    if not validate_phone(phone):
-        return jsonify({
-            "success": False,
-            "message": "Số điện thoại phải đủ 10 số và bắt đầu bằng số 0."
-        }), 400
+    match_id = None
 
-    if not pin and not rfid:
-        return jsonify({
-            "success": False,
-            "message": "Khách phải nhập ít nhất mã PIN hoặc RFID để tra cứu phiên lấy đồ."
-        }), 400
+    for sid, s in sessions.items():
 
-    sessions = get_all_sessions()
-    matches = []
+        if not s.get("active"):
+            continue
 
-    for session_id, session in sessions.items():
-        correct_user = (
-            session.get("active") == True
-            and normalize_text(session.get("name")) == normalize_text(name)
-            and session.get("phone") == phone
+        if str(s.get("locker")) != locker:
+            continue
+
+        if s.get("name", "").lower() != name.lower():
+            continue
+
+        if s.get("phone") != phone:
+            continue
+
+        ok_auth = (
+            (pin and s.get("pin") == pin) or
+            (rfid and s.get("rfid") == rfid)
         )
 
-        correct_auth = (
-            (pin and session.get("pin") == pin)
-            or
-            (rfid and session.get("rfid") == rfid)
-        )
+        if ok_auth:
+            match_id = sid
+            break
 
-        if correct_user and correct_auth:
-            matches.append({
-                "session_id": session_id,
-                "locker": session.get("locker"),
-                "name": session.get("name"),
-                "phone": session.get("phone"),
-                "rfid": session.get("rfid", ""),
-                "active": session.get("active")
-            })
+    if not match_id:
+        return jsonify({"success": False, "message": "Not found"}), 404
 
-    if not matches:
-        return jsonify({
-            "success": False,
-            "message": "Không tìm thấy phiên lấy đồ phù hợp."
-        }), 404
+    db.reference(f"sessions/{match_id}").update({"active": False})
+
+    cmd = f"OPEN_LOCKER_{locker}"
+    send_command(cmd)
 
     return jsonify({
         "success": True,
-        "message": "Tra cứu phiên lấy đồ thành công",
-        "sessions": matches
-    }), 200
+        "esp32_command": cmd
+    })
 
 
 # =========================
-# 5. API XEM TẤT CẢ PHIÊN
-# Dùng để debug
+# START SERIAL THREAD
 # =========================
-
-@app.route("/sessions", methods=["GET"])
-def list_sessions():
-    sessions = get_all_sessions()
-
-    return jsonify({
-        "success": True,
-        "data": sessions
-    }), 200
+threading.Thread(target=serial_listener, daemon=True).start()
 
 
+# =========================
+# RUN
+# =========================
 if __name__ == "__main__":
-    app.run(debug=True)
+    print("SERVER STARTED")
+    app.run(host="0.0.0.0", port=5000, debug=False)
